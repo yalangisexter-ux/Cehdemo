@@ -15,8 +15,14 @@ def index():
 def health_check():
     return jsonify({"status": "healthy"}), 200
 
-@app.route('/collect', methods=['POST'])
+@app.route('/collect', methods=['GET', 'POST'])
 def collect_data():
+    if request.method == 'GET':
+        return jsonify({
+            "status": "active",
+            "message": "Send POST requests here from your attacker, defender, or rootaudit apps."
+        }), 200
+    
     try:
         data = request.get_json(silent=True) or request.form.to_dict() or request.data.decode('utf-8', errors='ignore')
         print(f"[Lab Data Received]: {data}")
