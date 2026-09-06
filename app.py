@@ -28,7 +28,7 @@ def collect_data():
         print(f"[Lab Data Received]: {data}")
         return jsonify({
             "status": "success",
-            "message": "Data successfully exfiltrated/recorded",
+            "message": "Data successfully received/recorded",
             "received": data
         }), 200
     except Exception as e:
