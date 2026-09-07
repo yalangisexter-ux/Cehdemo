@@ -1,0 +1,8 @@
+# requirements.txt
+# Python dependencies for the current project.
+#
+# The project currently uses only Python standard-library modules:
+# os, sys, uuid, hashlib, random, string, struct, zlib, base64,
+# json, and datetime.
+#
+# No third-party packages are required.
