@@ -30,15 +30,16 @@ jobs:
         run: |
           python advanced_build.py
 
-          echo "=== Generated project ==="
-          find output/generated_project -maxdepth 4 -type f -print
+          echo "=== Generated project files ==="
+          find . -maxdepth 4 -type f \
+            ! -path "./.git/*" \
+            -print
 
-          echo "=== Generated settings.gradle ==="
-          if [ -f output/generated_project/settings.gradle ]; then
-            cat output/generated_project/settings.gradle
-          elif [ -f output/generated_project/settings.gradle.kts ]; then
-            echo "settings.gradle.kts found:"
-            cat output/generated_project/settings.gradle.kts
+          echo "=== settings.gradle ==="
+          if [ -f settings.gradle ]; then
+            cat settings.gradle
+          elif [ -f settings.gradle.kts ]; then
+            cat settings.gradle.kts
           else
             echo "ERROR: No settings.gradle or settings.gradle.kts found."
             exit 1
@@ -61,21 +62,19 @@ jobs:
       - name: Generate Gradle Wrapper
         run: |
           /tmp/gradle-8.2/bin/gradle \
-            -p output/generated_project \
             wrapper \
             --gradle-version 8.2
 
       - name: Make gradlew executable
         run: |
-          chmod +x output/generated_project/gradlew
+          chmod +x gradlew
 
       - name: Verify Gradle Wrapper
         run: |
-          ls -la output/generated_project/gradlew
-          ls -la output/generated_project/gradle/wrapper/
+          ls -la gradlew
+          ls -la gradle/wrapper/
 
       - name: Build Debug APK
-        working-directory: output/generated_project
         run: |
           ./gradlew assembleDebug
 
@@ -83,5 +82,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: output/generated_project/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
