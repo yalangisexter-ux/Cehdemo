@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace 'com.system.fe9f85b7'
+    namespace 'com.system.cedd1744'
     compileSdk 34
     defaultConfig {
-        applicationId 'com.system.fe9f85b7'
+        applicationId 'com.system.cedd1744'
         minSdk 28
         targetSdk 34
-        versionCode 362
+        versionCode 894
         versionName '14.2.1'
         
         proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
