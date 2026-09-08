@@ -30,20 +30,36 @@ jobs:
         run: |
           python advanced_build.py
 
-          echo "=== Generated project files ==="
+          echo "=== Generated files ==="
           find . -maxdepth 4 -type f \
             ! -path "./.git/*" \
             -print
 
-          echo "=== settings.gradle ==="
-          if [ -f settings.gradle ]; then
-            cat settings.gradle
-          elif [ -f settings.gradle.kts ]; then
-            cat settings.gradle.kts
-          else
-            echo "ERROR: No settings.gradle or settings.gradle.kts found."
-            exit 1
-          fi
+      - name: Fix generated settings.gradle
+        run: |
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "Cehdemo"
+          include(":app")
+          EOF
+
+          echo "=== Fixed settings.gradle ==="
+          cat settings.gradle
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -71,7 +87,10 @@ jobs:
 
       - name: Verify Gradle Wrapper
         run: |
+          echo "=== gradlew ==="
           ls -la gradlew
+
+          echo "=== Gradle wrapper files ==="
           ls -la gradle/wrapper/
 
       - name: Build Debug APK
