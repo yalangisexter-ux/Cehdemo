@@ -20,7 +20,8 @@ def home():
     })
 
 
-@app.route("/generate", methods=["POST"])
+# FIX: Allow both GET and POST so you can test in the browser
+@app.route("/generate", methods=["GET", "POST"])
 def generate_project():
     try:
         generator = ProjectGenerator()
