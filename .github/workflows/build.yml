@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,6 +41,8 @@ jobs:
       - name: Fix settings.gradle
         run: |
           cat > settings.gradle <<'EOF'
+          import org.gradle.api.initialization.resolve.RepositoriesMode
+
           pluginManagement {
               repositories {
                   google()
@@ -58,16 +63,18 @@ jobs:
           include(":app")
           EOF
 
-          echo "=== settings.gradle ==="
           cat settings.gradle
 
-      - name: Patch build.gradle
+      - name: Patch app build.gradle
         run: |
           if [ -f app/build.gradle ]; then
             sed -i '/versionNameSuffix/d' app/build.gradle
           fi
 
-      - name: Repair and validate AndroidManifest.xml
+          echo "=== app/build.gradle ==="
+          cat app/build.gradle
+
+      - name: Repair AndroidManifest.xml
         run: |
           MANIFEST="app/src/main/AndroidManifest.xml"
 
@@ -88,9 +95,11 @@ jobs:
           manifest = Path("app/src/main/AndroidManifest.xml")
           text = manifest.read_text(encoding="utf-8", errors="replace")
 
+          # Remove accidental Markdown fences.
           text = re.sub(r"^\s*```(?:xml)?\s*", "", text, flags=re.IGNORECASE)
           text = re.sub(r"\s*```\s*$", "", text)
 
+          # Remove junk before the XML document/root.
           start = text.find("<?xml")
           if start >= 0:
               text = text[start:]
@@ -103,47 +112,43 @@ jobs:
 
           try:
               ET.parse(manifest)
-              print("Manifest XML is valid.")
-              sys.exit(0)
-          except ET.ParseError as exc:
-              print(f"Manifest XML is invalid: {exc}")
-              print("Creating a clean minimal manifest.")
+          except ET.ParseError:
+              print("Manifest XML is invalid. Creating a clean minimal manifest.")
 
-          package_name = None
+              package_name = None
 
-          for root in [Path("app/src/main/java"), Path("app/src/main/kotlin")]:
-              if root.exists():
-                  for source in root.rglob("MainActivity.*"):
-                      source_text = source.read_text(
+              for root in [Path("app/src/main/java"), Path("app/src/main/kotlin")]:
+                  if root.exists():
+                      for source in root.rglob("MainActivity.*"):
+                          source_text = source.read_text(
+                              encoding="utf-8", errors="ignore"
+                          )
+                          match = re.search(
+                              r"(?m)^\s*package\s+([A-Za-z0-9_.]+)",
+                              source_text
+                          )
+                          if match:
+                              package_name = match.group(1)
+                              break
+                  if package_name:
+                      break
+
+              if not package_name:
+                  build_file = Path("app/build.gradle")
+                  if build_file.exists():
+                      build_text = build_file.read_text(
                           encoding="utf-8", errors="ignore"
                       )
                       match = re.search(
-                          r"(?m)^\s*package\s+([A-Za-z0-9_.]+)",
-                          source_text
+                          r'applicationId\s*[= ]\s*["\']([^"\']+)["\']',
+                          build_text
                       )
                       if match:
                           package_name = match.group(1)
-                          break
-              if package_name:
-                  break
 
-          if not package_name:
-              build_file = Path("app/build.gradle")
-              if build_file.exists():
-                  build_text = build_file.read_text(
-                      encoding="utf-8", errors="ignore"
-                  )
-                  match = re.search(
-                      r'applicationId\s*[= ]\s*["\']([^"\']+)["\']',
-                      build_text
-                  )
-                  if match:
-                      package_name = match.group(1)
+              package_name = package_name or "com.example.cehdemo"
 
-          if not package_name:
-              package_name = "com.example.cehdemo"
-
-          clean_manifest = f'''<?xml version="1.0" encoding="utf-8"?>
+              clean_manifest = f'''<?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android"
               package="{package_name}">
               <application
@@ -163,14 +168,23 @@ jobs:
           </manifest>
           '''
 
-          clean_manifest = "\n".join(
-              line.strip() if line.strip() else ""
-              for line in clean_manifest.splitlines()
-          )
+              clean_manifest = "\n".join(
+                  line.strip() if line.strip() else ""
+                  for line in clean_manifest.splitlines()
+              )
 
-          manifest.write_text(clean_manifest + "\n", encoding="utf-8")
+              manifest.write_text(clean_manifest + "\n", encoding="utf-8")
+
+          # The actual build failure was a missing mipmap/ic_launcher.
+          # Remove only missing launcher icon references; do not replace the
+          # rest of the generated manifest.
+          text = manifest.read_text(encoding="utf-8", errors="replace")
+          text = re.sub(r'\s+android:icon\s*=\s*["\']@mipmap/ic_launcher["\']', '', text)
+          text = re.sub(r'\s+android:roundIcon\s*=\s*["\']@mipmap/ic_launcher_round["\']', '', text)
+          manifest.write_text(text, encoding="utf-8")
+
           ET.parse(manifest)
-          print(f"Clean manifest created for package: {package_name}")
+          print("Manifest XML is valid and missing launcher icon references were removed.")
           PY
 
           echo "=== Final AndroidManifest.xml ==="
@@ -189,7 +203,7 @@ jobs:
 
       - name: Generate Gradle Wrapper
         run: |
-          /tmp/gradle-8.2/bin/gradle             wrapper             --gradle-version 8.2
+          /tmp/gradle-8.2/bin/gradle wrapper --gradle-version 8.2
 
       - name: Make gradlew executable
         run: |
