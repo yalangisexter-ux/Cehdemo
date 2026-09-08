@@ -26,20 +26,40 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+          cache: "gradle"
+
       - name: Generate Android Project
         run: |
           python advanced_build.py
-          echo "Generation complete."
-          ls -la output/generated_project/
+
+          echo "=== Generated project ==="
+          find output/generated_project -maxdepth 3 -type f -print
+
+          echo "=== Generated settings.gradle ==="
+          if [ -f output/generated_project/settings.gradle ]; then
+            cat output/generated_project/settings.gradle
+          elif [ -f output/generated_project/settings.gradle.kts ]; then
+            echo "settings.gradle.kts found:"
+            cat output/generated_project/settings.gradle.kts
+          else
+            echo "ERROR: No settings.gradle or settings.gradle.kts found."
+            exit 1
+          fi
 
       - name: Download Gradle 8.2
         run: |
           curl -fL \
             -o /tmp/gradle-8.2-bin.zip \
             https://services.gradle.org/distributions/gradle-8.2-bin.zip
+
           unzip -q /tmp/gradle-8.2-bin.zip -d /tmp
 
-      - name: Generate real Gradle Wrapper
+      - name: Generate Gradle Wrapper
         run: |
           /tmp/gradle-8.2/bin/gradle \
             -p output/generated_project \
@@ -50,12 +70,10 @@ jobs:
         run: |
           chmod +x output/generated_project/gradlew
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-          cache: "gradle"
+      - name: Verify Gradle Wrapper
+        run: |
+          ls -la output/generated_project/gradlew
+          ls -la output/generated_project/gradle/wrapper/
 
       - name: Build Debug APK
         working-directory: output/generated_project
@@ -67,3 +85,4 @@ jobs:
         with:
           name: app-debug
           path: output/generated_project/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
