@@ -1,0 +1,31 @@
+
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.system.6bd55ca2'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'com.system.6bd55ca2'
+        minSdk 28
+        targetSdk 34
+        versionCode 471
+        versionName '14.2.1'
+        
+        proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+    }
+    
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'androidx.core:core-ktx:1.12.0'
+}
