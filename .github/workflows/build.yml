@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: "17"
           distribution: "temurin"
@@ -89,9 +89,11 @@ jobs:
           fi
           ls -la gradle/wrapper/
 
-      - name: Fix settings.gradle
+      - name: Fix settings.gradle and create gradle.properties
         run: |
           cd "$PROJECT_ROOT"
+          
+          # Create settings.gradle
           cat > settings.gradle <<'GRADLE'
           import org.gradle.api.initialization.resolve.RepositoriesMode
 
@@ -114,7 +116,16 @@ jobs:
           rootProject.name = "Cehdemo"
           include(":app")
           GRADLE
+          
+          # Create gradle.properties - THIS IS THE FIX
+          cat > gradle.properties <<'PROPS'
+          android.useAndroidX=true
+          android.enableJetifier=true
+          org.gradle.jvmargs=-Xmx2048m
+          PROPS
+          
           cat settings.gradle
+          cat gradle.properties
 
       - name: Patch app build.gradle
         run: |
@@ -143,8 +154,8 @@ jobs:
           from pathlib import Path
           manifest = Path("app/src/main/AndroidManifest.xml")
           text = manifest.read_text(encoding="utf-8", errors="replace")
-          text = re.sub(r"^\s*```(?:xml)?\s*", "", text, flags=re.IGNORECASE)
-          text = re.sub(r"\s*```\s*$", "", text)
+          text = re.sub(r"^\s*\`\`\`(?:xml)?\s*", "", text, flags=re.IGNORECASE)
+          text = re.sub(r"\s*\`\`\`\s*$", "", text)
           start = text.find("<?xml")
           if start >= 0:
               text = text[start:]
@@ -174,18 +185,18 @@ jobs:
                   build_file = Path("app/build.gradle")
                   if build_file.exists():
                       build_text = build_file.read_text(encoding="utf-8", errors="ignore")
-                      match = re.search(r"applicationId\s*[= ]\s*[\"\x27]([^\"\x27]+)[\"\x27]", build_text)
+                      match = re.search(r"applicationId\s*[= ]\s*[\"\\x27]([^\"\\x27]+)[\"\\x27]", build_text)
                       if match:
                           package_name = match.group(1)
               if not package_name:
                   package_name = "com.example.cehdemo"
-              clean_manifest = """<?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="__PACKAGE__">
-              <application android:allowBackup="true" android:label="Cehdemo" android:supportsRtl="true" android:theme="@android:style/Theme.Material.Light">
-                  <activity android:name=".MainActivity" android:exported="true">
+              clean_manifest = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
+          <manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"__PACKAGE__\">
+              <application android:allowBackup=\"true\" android:label=\"Cehdemo\" android:supportsRtl=\"true\" android:theme=\"@android:style/Theme.Material.Light\">
+                  <activity android:name=\".MainActivity\" android:exported=\"true\">
                       <intent-filter>
-                          <action android:name="android.intent.action.MAIN" />
-                          <category android:name="android.intent.category.LAUNCHER" />
+                          <action android:name=\"android.intent.action.MAIN\" />
+                          <category android:name=\"android.intent.category.LAUNCHER\" />
                       </intent-filter>
                   </activity>
               </application>
@@ -255,7 +266,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$PROJECT_ROOT/app" "$PROJECT_ROOT/build.gradle" "$PROJECT_ROOT/settings.gradle" "$PROJECT_ROOT/gradle" "$PROJECT_ROOT/gradlew" "$PROJECT_ROOT/gradlew.bat"
+          git add "$PROJECT_ROOT/app" "$PROJECT_ROOT/build.gradle" "$PROJECT_ROOT/settings.gradle" "$PROJECT_ROOT/gradle" "$PROJECT_ROOT/gradlew" "$PROJECT_ROOT/gradlew.bat" "$PROJECT_ROOT/gradle.properties"
           if git diff --cached --quiet; then
             echo "No generated Android project changes."
           else
