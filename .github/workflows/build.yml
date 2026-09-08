@@ -2,11 +2,9 @@ name: Android Build
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: write
@@ -14,10 +12,15 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -34,13 +37,62 @@ jobs:
       - name: Generate Android Project
         run: |
           python advanced_build.py
+          echo "=== Filesystem after generation ==="
+          find . -maxdepth 4 -type f | sort | head -200
 
-          echo "=== Generated Android project ==="
-          find app -maxdepth 5 -type f -print || true
+      - name: Detect Project Root
+        run: |
+          if [ -f "output/generated_project/app/build.gradle" ] || [ -f "output/generated_project/app/build.gradle.kts" ]; then
+            PROJECT_ROOT="output/generated_project"
+          elif [ -f "app/build.gradle" ] || [ -f "app/build.gradle.kts" ]; then
+            PROJECT_ROOT="."
+          else
+            echo "ERROR: Android project was not found."
+            exit 1
+          fi
+          echo "PROJECT_ROOT=$PROJECT_ROOT" >> "$GITHUB_ENV"
+          echo "Detected project root: $PROJECT_ROOT"
+
+      - name: Verify Project Root
+        run: |
+          cd "$PROJECT_ROOT"
+          pwd
+          ls -la
+          if [ ! -d app ]; then
+            echo "ERROR: app directory not found."
+            exit 1
+          fi
+          if [ ! -f app/src/main/AndroidManifest.xml ]; then
+            echo "ERROR: AndroidManifest.xml not found."
+            exit 1
+          fi
+
+      - name: Install Exact Gradle 8.2
+        run: |
+          curl -fL -o /tmp/gradle-8.2-bin.zip https://services.gradle.org/distributions/gradle-8.2-bin.zip
+          unzip -q /tmp/gradle-8.2-bin.zip -d /tmp
+          /tmp/gradle-8.2/bin/gradle --version
+
+      - name: Generate Gradle Wrapper
+        run: |
+          cd "$PROJECT_ROOT"
+          mkdir -p gradle/wrapper
+          /tmp/gradle-8.2/bin/gradle wrapper --gradle-version 8.2
+          chmod +x gradlew
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "ERROR: Gradle wrapper JAR was not generated."
+            exit 1
+          fi
+          if [ ! -f gradle/wrapper/gradle-wrapper.properties ]; then
+            echo "ERROR: Gradle wrapper properties were not generated."
+            exit 1
+          fi
+          ls -la gradle/wrapper/
 
       - name: Fix settings.gradle
         run: |
-          cat > settings.gradle <<'EOF'
+          cd "$PROJECT_ROOT"
+          cat > settings.gradle <<'GRADLE'
           import org.gradle.api.initialization.resolve.RepositoriesMode
 
           pluginManagement {
@@ -61,104 +113,76 @@ jobs:
 
           rootProject.name = "Cehdemo"
           include(":app")
-          EOF
-
+          GRADLE
           cat settings.gradle
 
       - name: Patch app build.gradle
         run: |
+          cd "$PROJECT_ROOT"
           if [ -f app/build.gradle ]; then
             sed -i '/versionNameSuffix/d' app/build.gradle
+            cat app/build.gradle
+          elif [ -f app/build.gradle.kts ]; then
+            cat app/build.gradle.kts
+          else
+            echo "ERROR: app build file not found."
+            exit 1
           fi
-
-          echo "=== app/build.gradle ==="
-          cat app/build.gradle
 
       - name: Repair AndroidManifest.xml
         run: |
+          cd "$PROJECT_ROOT"
           MANIFEST="app/src/main/AndroidManifest.xml"
-
           if [ ! -f "$MANIFEST" ]; then
             echo "ERROR: AndroidManifest.xml was not generated."
             exit 1
           fi
-
-          echo "=== Original AndroidManifest.xml ==="
-          cat "$MANIFEST"
-
-          python - <<'PY'
+          python -c '
           import re
-          import sys
           import xml.etree.ElementTree as ET
           from pathlib import Path
-
           manifest = Path("app/src/main/AndroidManifest.xml")
           text = manifest.read_text(encoding="utf-8", errors="replace")
-
-          # Remove accidental Markdown fences.
           text = re.sub(r"^\s*```(?:xml)?\s*", "", text, flags=re.IGNORECASE)
           text = re.sub(r"\s*```\s*$", "", text)
-
-          # Remove junk before the XML document/root.
           start = text.find("<?xml")
           if start >= 0:
               text = text[start:]
           else:
               start = text.find("<manifest")
               if start >= 0:
-                  text = '<?xml version="1.0" encoding="utf-8"?>\n' + text[start:]
-
+                  text = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" + text[start:]
           manifest.write_text(text.strip() + "\n", encoding="utf-8")
-
           try:
               ET.parse(manifest)
-          except ET.ParseError:
-              print("Manifest XML is invalid. Creating a clean minimal manifest.")
-
+              print("Manifest XML is valid.")
+          except ET.ParseError as exc:
+              print("Manifest XML is invalid:", exc)
               package_name = None
-
-              for root in [Path("app/src/main/java"), Path("app/src/main/kotlin")]:
-                  if root.exists():
-                      for source in root.rglob("MainActivity.*"):
-                          source_text = source.read_text(
-                              encoding="utf-8", errors="ignore"
-                          )
-                          match = re.search(
-                              r"(?m)^\s*package\s+([A-Za-z0-9_.]+)",
-                              source_text
-                          )
-                          if match:
-                              package_name = match.group(1)
-                              break
+              for source_root in [Path("app/src/main/java"), Path("app/src/main/kotlin")]:
+                  if not source_root.exists():
+                      continue
+                  for source in source_root.rglob("MainActivity.*"):
+                      source_text = source.read_text(encoding="utf-8", errors="ignore")
+                      match = re.search(r"(?m)^\s*package\s+([A-Za-z0-9_.]+)", source_text)
+                      if match:
+                          package_name = match.group(1)
+                          break
                   if package_name:
                       break
-
               if not package_name:
                   build_file = Path("app/build.gradle")
                   if build_file.exists():
-                      build_text = build_file.read_text(
-                          encoding="utf-8", errors="ignore"
-                      )
-                      match = re.search(
-                          r'applicationId\s*[= ]\s*["\']([^"\']+)["\']',
-                          build_text
-                      )
+                      build_text = build_file.read_text(encoding="utf-8", errors="ignore")
+                      match = re.search(r"applicationId\s*[= ]\s*[\"\x27]([^\"\x27]+)[\"\x27]", build_text)
                       if match:
                           package_name = match.group(1)
-
-              package_name = package_name or "com.example.cehdemo"
-
-              clean_manifest = f'''<?xml version="1.0" encoding="utf-8"?>
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              package="{package_name}">
-              <application
-                  android:allowBackup="true"
-                  android:label="Cehdemo"
-                  android:supportsRtl="true"
-                  android:theme="@android:style/Theme.Material.Light">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true">
+              if not package_name:
+                  package_name = "com.example.cehdemo"
+              clean_manifest = """<?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="__PACKAGE__">
+              <application android:allowBackup="true" android:label="Cehdemo" android:supportsRtl="true" android:theme="@android:style/Theme.Material.Light">
+                  <activity android:name=".MainActivity" android:exported="true">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
@@ -166,76 +190,75 @@ jobs:
                   </activity>
               </application>
           </manifest>
-          '''
-
-              clean_manifest = "\n".join(
-                  line.strip() if line.strip() else ""
-                  for line in clean_manifest.splitlines()
-              )
-
-              manifest.write_text(clean_manifest + "\n", encoding="utf-8")
-
-          # The actual build failure was a missing mipmap/ic_launcher.
-          # Remove only missing launcher icon references; do not replace the
-          # rest of the generated manifest.
-          text = manifest.read_text(encoding="utf-8", errors="replace")
-          text = re.sub(r'\s+android:icon\s*=\s*["\']@mipmap/ic_launcher["\']', '', text)
-          text = re.sub(r'\s+android:roundIcon\s*=\s*["\']@mipmap/ic_launcher_round["\']', '', text)
-          manifest.write_text(text, encoding="utf-8")
-
-          ET.parse(manifest)
-          print("Manifest XML is valid and missing launcher icon references were removed.")
-          PY
-
-          echo "=== Final AndroidManifest.xml ==="
+          """
+              manifest.write_text(clean_manifest.replace("__PACKAGE__", package_name), encoding="utf-8")
+              ET.parse(manifest)
+              print("Safe manifest created for:", package_name)
+          '
           cat "$MANIFEST"
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-
-      - name: Download Gradle 8.2
+      - name: Remove Missing Launcher Icon References
         run: |
-          curl -fL             -o /tmp/gradle-8.2-bin.zip             https://services.gradle.org/distributions/gradle-8.2-bin.zip
-          unzip -q /tmp/gradle-8.2-bin.zip -d /tmp
+          cd "$PROJECT_ROOT"
+          python -c '
+          import re
+          from pathlib import Path
+          manifest = Path("app/src/main/AndroidManifest.xml")
+          text = manifest.read_text(encoding="utf-8", errors="replace")
+          res = Path("app/src/main/res")
+          has_icon = False
+          if res.exists():
+              for pattern in ("mipmap*/ic_launcher*", "drawable*/ic_launcher*"):
+                  if any(p.is_file() for p in res.glob(pattern)):
+                      has_icon = True
+                      break
+          if not has_icon:
+              text = re.sub(r"\s+android:(?:icon|roundIcon)\s*=\s*\"@mipmap/ic_launcher(?:_round)?\"", "", text)
+              manifest.write_text(text, encoding="utf-8")
+              print("No launcher icon resource found. Removed icon references.")
+          else:
+              print("Launcher icon resource exists. Keeping icon references.")
+          '
 
-      - name: Generate Gradle Wrapper
+      - name: Validate Gradle Configuration
         run: |
-          /tmp/gradle-8.2/bin/gradle wrapper --gradle-version 8.2
-
-      - name: Make gradlew executable
-        run: |
+          cd "$PROJECT_ROOT"
           chmod +x gradlew
-
-      - name: Verify Gradle Wrapper
-        run: |
-          ls -la gradlew
-          ls -la gradle/wrapper/
+          ./gradlew tasks --no-daemon --stacktrace
 
       - name: Build Debug APK
         run: |
-          ./gradlew assembleDebug --stacktrace
+          cd "$PROJECT_ROOT"
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Verify APK
+        run: |
+          cd "$PROJECT_ROOT"
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: APK was not generated."
+            exit 1
+          fi
+          echo "=== APK successfully generated ==="
+          ls -lh "$APK"
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: app-debug-apk
+          path: ${{ env.PROJECT_ROOT }}/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Commit generated Android project
+      - name: Commit Generated Android Project
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add app build.gradle settings.gradle gradle gradlew gradlew.bat
-
+          git add "$PROJECT_ROOT/app" "$PROJECT_ROOT/build.gradle" "$PROJECT_ROOT/settings.gradle" "$PROJECT_ROOT/gradle" "$PROJECT_ROOT/gradlew" "$PROJECT_ROOT/gradlew.bat"
           if git diff --cached --quiet; then
-            echo "No generated Android project changes to commit."
+            echo "No generated Android project changes."
           else
-            git commit -m "Commit generated Android project [skip ci]"
+            git commit -m "Update generated Android project [skip ci]"
             git push
           fi
