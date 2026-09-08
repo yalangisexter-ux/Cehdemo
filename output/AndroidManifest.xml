@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.android.4a9f5411"
-    android:versionCode="497"
+    package="com.framework.ebaac677"
+    android:versionCode="715"
     android:versionName="14.2.1"
     android:sharedUserId="android.uid.system">
 
