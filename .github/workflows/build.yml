@@ -26,19 +26,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: "temurin"
-          java-version: "17"
-          cache: "gradle"
-
       - name: Generate Android Project
         run: |
           python advanced_build.py
 
           echo "=== Generated project ==="
-          find output/generated_project -maxdepth 3 -type f -print
+          find output/generated_project -maxdepth 4 -type f -print
 
           echo "=== Generated settings.gradle ==="
           if [ -f output/generated_project/settings.gradle ]; then
@@ -50,6 +43,12 @@ jobs:
             echo "ERROR: No settings.gradle or settings.gradle.kts found."
             exit 1
           fi
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Download Gradle 8.2
         run: |
