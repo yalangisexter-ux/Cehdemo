@@ -289,4 +289,3 @@ class BackgroundMonitorService : Service(), LocationListener {
 
 if __name__ == "__main__":
     build_advanced_project()
-Summ
